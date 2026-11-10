@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 北京大叔「思考」循环动画：20 帧 × 103ms ≈ 2.06 秒，首尾衔接无缝循环 -->
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:oneshot="false">
+    <item android:drawable="@drawable/think_00" android:duration="103" />
+    <item android:drawable="@drawable/think_01" android:duration="103" />
+    <item android:drawable="@drawable/think_02" android:duration="103" />
+    <item android:drawable="@drawable/think_03" android:duration="103" />
+    <item android:drawable="@drawable/think_04" android:duration="103" />
+    <item android:drawable="@drawable/think_05" android:duration="103" />
+    <item android:drawable="@drawable/think_06" android:duration="103" />
+    <item android:drawable="@drawable/think_07" android:duration="103" />
+    <item android:drawable="@drawable/think_08" android:duration="103" />
+    <item android:drawable="@drawable/think_09" android:duration="103" />
+    <item android:drawable="@drawable/think_10" android:duration="103" />
+    <item android:drawable="@drawable/think_11" android:duration="103" />
+    <item android:drawable="@drawable/think_12" android:duration="103" />
+    <item android:drawable="@drawable/think_13" android:duration="103" />
+    <item android:drawable="@drawable/think_14" android:duration="103" />
+    <item android:drawable="@drawable/think_15" android:duration="103" />
+    <item android:drawable="@drawable/think_16" android:duration="103" />
+    <item android:drawable="@drawable/think_17" android:duration="103" />
+    <item android:drawable="@drawable/think_18" android:duration="103" />
+    <item android:drawable="@drawable/think_19" android:duration="103" />
+</animation-list>

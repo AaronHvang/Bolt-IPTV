@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.FreeTV" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorPrimaryDark">@color/bg</item>
+        <item name="alertDialogTheme">@style/Theme.FreeTV.Dialog</item>
+        <item name="android:alertDialogTheme">@style/Theme.FreeTV.Dialog</item>
+    </style>
+
+    <style name="Theme.FreeTV.Player" parent="Theme.FreeTV">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+
+    <style name="Theme.FreeTV.Dialog" parent="Theme.AppCompat.Light.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/bg_dialog</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:colorBackground">@color/panel</item>
+        <item name="colorAccent">@color/accent</item>
+    </style>
+
+</resources>

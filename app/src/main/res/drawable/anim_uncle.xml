@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 北京大叔「进入」动画：源视频 1.667s，按 0.8 倍速播放，仅播放一次 -->
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:oneshot="true">
+    <item android:drawable="@drawable/uncle_00" android:duration="139" />
+    <item android:drawable="@drawable/uncle_01" android:duration="139" />
+    <item android:drawable="@drawable/uncle_02" android:duration="139" />
+    <item android:drawable="@drawable/uncle_03" android:duration="139" />
+    <item android:drawable="@drawable/uncle_04" android:duration="139" />
+    <item android:drawable="@drawable/uncle_05" android:duration="139" />
+    <item android:drawable="@drawable/uncle_06" android:duration="139" />
+    <item android:drawable="@drawable/uncle_07" android:duration="139" />
+    <item android:drawable="@drawable/uncle_08" android:duration="139" />
+    <item android:drawable="@drawable/uncle_09" android:duration="139" />
+    <item android:drawable="@drawable/uncle_10" android:duration="139" />
+    <item android:drawable="@drawable/uncle_11" android:duration="139" />
+    <item android:drawable="@drawable/uncle_12" android:duration="139" />
+    <item android:drawable="@drawable/uncle_13" android:duration="139" />
+    <item android:drawable="@drawable/uncle_14" android:duration="139" />
+</animation-list>
