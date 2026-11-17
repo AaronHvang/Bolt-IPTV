@@ -135,7 +135,7 @@ fi
 BODY="### 安装
 \`\`\`bash
 adb connect <电视IP>:5555
-adb install -r ${APP_NAME}-${VERSION}.apk
+adb install -r ${APP_NAME}.apk
 \`\`\`
 
 ### 说明
@@ -171,7 +171,7 @@ echo "Release id: $REL_ID"
 # ---------- 6. 上传 APK ----------
 say "上传 APK"
 
-UPLOAD_URL="https://uploads.github.com/repos/$REPO/releases/$REL_ID/assets?name=${APP_NAME}-${VERSION}.apk"
+UPLOAD_URL="https://uploads.github.com/repos/$REPO/releases/$REL_ID/assets?name=${APP_NAME}.apk"
 
 wait_uploaded() {
   local i
@@ -219,7 +219,7 @@ done
 # ---------- 7. 完成 ----------
 say "发版完成"
 URL="https://github.com/$REPO/releases/tag/$TAG"
-DL="https://github.com/$REPO/releases/latest/download/${APP_NAME}-${VERSION}.apk"
+DL="https://github.com/$REPO/releases/latest/download/${APP_NAME}.apk"
 echo "Release: $URL"
 echo "下载:    $DL"
 curl -sS -o /dev/null -w "下载直链校验: HTTP %{http_code}, %{size_download} bytes\n" -L "$DL"

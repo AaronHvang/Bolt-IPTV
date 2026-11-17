@@ -14,11 +14,15 @@ Bolt IPTV 提供低延迟 IPTV 流媒体能力，实现音视频一体化局域�
 
 ## 下载安装
 
-到 [Releases](https://github.com/AaronHvang/Bolt-IPTV/releases/latest) 下载最新的 `Bolt-IPTV-x.y.z.apk`，侧载到 Android TV / 投影仪 / 机顶盒即可：
+到 [Releases](https://github.com/AaronHvang/Bolt-IPTV/releases/latest) 下载最新的 `Bolt-IPTV.apk`，侧载到 Android TV / 投影仪 / 机顶盒即可。附件名固定不变，下面的直链始终指向最新版本：
+
+```
+https://github.com/AaronHvang/Bolt-IPTV/releases/latest/download/Bolt-IPTV.apk
+```
 
 ```bash
 adb connect <电视IP>:5555
-adb install -r Bolt-IPTV-1.0.0.apk
+adb install -r Bolt-IPTV.apk
 ```
 
 > APK 使用固定密钥签名，可覆盖升级；请勿从第三方渠道下载修改版。
