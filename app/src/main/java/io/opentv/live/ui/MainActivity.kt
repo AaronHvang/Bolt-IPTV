@@ -3,12 +3,15 @@ package io.opentv.live.ui
 import android.animation.ValueAnimator
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
+import androidx.media3.common.util.UnstableApi
 import io.opentv.live.App
 import io.opentv.live.R
 import io.opentv.live.data.Channel
@@ -19,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
+@OptIn(UnstableApi::class)
 class MainActivity : AppCompatActivity() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -27,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var content: android.widget.FrameLayout
     private lateinit var navPill: android.widget.FrameLayout
     private lateinit var navCursor: View
+    private lateinit var splash: View
     private lateinit var navItems: List<LinearLayout>
     /** 顶部导航游标的滑动动画，连续切换时先取消上一段 */
     private var cursorAnim: ValueAnimator? = null
@@ -41,12 +46,15 @@ class MainActivity : AppCompatActivity() {
     private var suppressAutoSwitch = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 立刻切回普通主题，否则 setContentView 会用 Launcher 主题的 windowBackground
+        setTheme(R.style.Theme_FreeTV)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         content = findViewById(R.id.content)
         navPill = findViewById(R.id.navPill)
         navCursor = findViewById(R.id.navCursor)
+        splash = findViewById(R.id.splash)
         navItems = listOf(
             findViewById(R.id.navChannels),
             findViewById(R.id.navFavorites),
@@ -91,23 +99,45 @@ class MainActivity : AppCompatActivity() {
         // 首次布局完成后把游标放到当前页，此后只做平滑滑动
         navPill.post { updateNavCursor(animate = false) }
 
-        // 首次进入：没有缓存时立即拉一次；有缓存时后台静默更新
+        // 首次进入：没有任何播放源时直接展示添加引导，不发起空刷新
         val repo = App.get().channels
-        if (repo.channels.isEmpty()) {
+        if (repo.sources.isNotEmpty() && repo.channels.isEmpty()) {
             refreshAll(manual = false)
-        } else if (App.get().prefs.autoUpdateOnStart) {
+        } else if (repo.sources.isNotEmpty() && App.get().prefs.autoUpdateOnStart) {
             refreshAll(manual = false, silent = true)
         }
         if (App.get().prefs.autoUpdateEpg && App.get().prefs.epgUrl.isNotBlank()) {
             refreshEpg(manual = false, silent = true)
         }
         App.get().epg.let { if (!it.loaded) it.loadCache() }
+
+        // 启动 splash 淡出：windowBackground 阶段已经显示了图标，
+        // setContentView 后布局 splash 层无缝衔接，停留足够久让用户看清 Bolt IPTV
+        splash.postDelayed({
+            splash.animate()
+                .alpha(0f)
+                .setDuration(600)
+                .withEndAction { splash.visibility = View.GONE }
+                .start()
+        }, 1500)
     }
 
     override fun onResume() {
         super.onResume()
         if (::channelView.isInitialized) channelView.refresh()
         if (::epgView.isInitialized) epgView.refreshNowLine()
+        // 从播放页或后台返回时，把焦点还给上次观看的频道；
+        // 只有焦点落在导航栏上时才保留用户的选择
+        window.decorView.post {
+            val focused = window.decorView.findFocus()
+            var onNav = false
+            var v: android.view.View? = focused
+            while (v != null) {
+                if (v === navPill) { onNav = true; break }
+                v = v.parent as? android.view.View
+            }
+            if (!onNav) channelView.restoreFocus(App.get().prefs.lastChannelId)
+        }
     }
 
     override fun onDestroy() {
@@ -184,11 +214,33 @@ class MainActivity : AppCompatActivity() {
         if (fromNav) return
 
         when (tab) {
-            TAB_CHANNELS, TAB_FAVORITES -> channelView.requestInitialFocus()
+            // Tab 切换回来时 LinearLayoutManager 已保留滚动位置，
+            // 只把焦点还给当前可见的卡片，不强制滚到中段或顶部
+            TAB_CHANNELS, TAB_FAVORITES -> channelView.focusCurrentVisible()
             TAB_EPG -> epgView.onShow()
             TAB_SOURCES -> sourcesView.refresh()
             TAB_SETTINGS -> settingsView.refresh()
         }
+    }
+
+    /**
+     * 频道/收藏页：焦点在「频道分类、随机播放、刷新」等头部按钮上按上键，统一回到当前页签的胶囊。
+     * 不能交给系统 FocusFinder：这些按钮靠右，系统会按横向距离选中「设置」，把页面直接切走。
+     * 焦点落在当前页签上时 switchTab 因 tab 相同直接返回，所以只是移动胶囊、不会再切页。
+     * 网格内不拦截，保持「卡片 → 头部按钮 → 胶囊」的逐级上移。
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val onChannelPage = currentTab == TAB_CHANNELS || currentTab == TAB_FAVORITES
+        if (event.action == KeyEvent.ACTION_DOWN &&
+            event.keyCode == KeyEvent.KEYCODE_DPAD_UP &&
+            onChannelPage &&
+            !channelView.isGridFocused() &&
+            navItems.none { it.hasFocus() }
+        ) {
+            navItems[if (currentTab == TAB_CHANNELS) 0 else 1].requestFocus()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     @Suppress("DEPRECATION")
@@ -215,6 +267,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshAll(manual: Boolean, silent: Boolean = false) {
+        if (App.get().channels.sources.isEmpty()) {
+            if (!silent) showStatus("还没有播放源，请先在「设置 → 管理播放源」中添加")
+            return
+        }
         refreshJob?.cancel()
         refreshJob = scope.launch {
             if (!silent) showStatus("正在更新播放源…")

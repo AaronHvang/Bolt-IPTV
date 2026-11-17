@@ -26,8 +26,11 @@ class SourceWebServer(
     var port: Int = 0
         private set
 
-    /** 二维码里要放的地址，例如 http://192.168.1.213:42001 */
-    val address: String get() = "http://${lanIp()}:$port"
+    /** 二维码优先使用排序后的第一个地址，其余候选地址展示给用户手动尝试 */
+    val addresses: List<String>
+        get() = lanIps().ifEmpty { listOf("127.0.0.1") }.map { "http://$it:$port" }
+
+    val address: String get() = addresses.first()
 
     fun start(): Boolean {
         if (serverSocket != null) return true
@@ -170,26 +173,31 @@ class SourceWebServer(
         out.flush()
     }
 
-    /** 取设备在局域网里的 IPv4，优先站点本地地址 */
-    private fun lanIp(): String {
+    /** 收集所有可用 IPv4，二维码使用常见家庭网段，其余网卡地址作为备用 */
+    private fun lanIps(): List<String> {
         return try {
             val candidates = ArrayList<String>()
-            val interfaces = NetworkInterface.getNetworkInterfaces() ?: return "127.0.0.1"
+            val interfaces = NetworkInterface.getNetworkInterfaces() ?: return emptyList()
             for (nif in interfaces) {
                 if (!nif.isUp || nif.isLoopback) continue
                 for (addr in nif.inetAddresses) {
-                    if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                    if (addr is Inet4Address && !addr.isLoopbackAddress && !addr.isLinkLocalAddress) {
                         candidates.add(addr.hostAddress ?: continue)
                     }
                 }
             }
-            candidates.firstOrNull { it.startsWith("192.168.") }
-                ?: candidates.firstOrNull { it.startsWith("10.") }
-                ?: candidates.firstOrNull { it.startsWith("172.") }
-                ?: candidates.firstOrNull()
-                ?: "127.0.0.1"
+            candidates.distinct().sortedWith(
+                compareBy<String> { ip ->
+                    when {
+                        ip.startsWith("192.168.") -> 0
+                        ip.startsWith("10.") -> 1
+                        ip.startsWith("172.") -> 2
+                        else -> 3
+                    }
+                }.thenBy { it }
+            )
         } catch (e: Exception) {
-            "127.0.0.1"
+            emptyList()
         }
     }
 

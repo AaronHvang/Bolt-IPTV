@@ -47,9 +47,12 @@
 
     <TextView
         android:id="@+id/errorText"
-        android:layout_width="620dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
+        android:layout_marginStart="32dp"
+        android:layout_marginEnd="32dp"
+        android:maxWidth="620dp"
         android:background="@drawable/bg_overlay_panel"
         android:gravity="center"
         android:lineSpacingExtra="6dp"
@@ -180,7 +183,7 @@
                             android:paddingBottom="1dp"
                             android:text="直播"
                             android:textColor="@color/accent"
-                            android:textSize="9sp" />
+                            android:textSize="11sp" />
 
                         <TextView
                             android:id="@+id/nowTime"
@@ -192,7 +195,7 @@
                             android:maxLines="1"
                             android:text=""
                             android:textColor="#9AA3AF"
-                            android:textSize="10sp" />
+                            android:textSize="11sp" />
                     </LinearLayout>
 
                     <ProgressBar
@@ -239,7 +242,7 @@
                         android:layout_marginTop="5dp"
                         android:text=""
                         android:textColor="#9AA3AF"
-                        android:textSize="9sp" />
+                        android:textSize="11sp" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -272,6 +275,7 @@
         android:layout_gravity="start"
         android:layout_marginStart="16dp"
         android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
         android:layout_marginBottom="16dp"
         android:background="@drawable/bg_overlay_panel"
         android:clipToOutline="true"

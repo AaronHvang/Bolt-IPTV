@@ -16,6 +16,8 @@
             android:layout_width="340dp"
             android:layout_height="340dp"
             android:layout_gravity="center"
+            android:maxWidth="260dp"
+            android:maxHeight="260dp"
             android:contentDescription="@string/app_name"
             android:scaleType="fitCenter" />
     </FrameLayout>

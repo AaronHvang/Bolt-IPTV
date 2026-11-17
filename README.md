@@ -1,8 +1,10 @@
-# FreeTV · 自由TV
+# Bolt IPTV
 
-面向电视与投影的原生 Android 直播电视播放器。遥控器优先、换台快、界面干净。
+**Bolt IPTV - 闪电流转，秒速畅播**
 
-基于 Kotlin + Media3(ExoPlayer) 自研，不依赖 Google 服务，可直接侧载到 Android TV / 投影仪 / 机顶盒。
+Bolt IPTV 提供低延迟 IPTV 流媒体能力，实现音视频一体化局域网影音体验，织调流光，秒速畅播。
+
+这是一款面向电视与投影的原生 Android 直播电视播放器，基于 Kotlin + Media3(ExoPlayer) 自研，不依赖 Google 服务，可直接侧载到 Android TV / 投影仪 / 机顶盒。
 
 <p>
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue">
@@ -56,9 +58,20 @@ echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
 ./gradlew assembleDebug
 # 产物：app/build/outputs/apk/debug/app-debug.apk
 
-# 3. 编译 Release（默认使用本机 debug keystore 签名，正式分发请自行配置签名）
+# 3. 编译 Release（未配置签名时生成未签名包，绝不使用 debug key）
 ./gradlew assembleRelease
 ```
+
+正式发布时在项目根目录创建已被 Git 忽略的 `keystore.properties`：
+
+```properties
+storeFile=/absolute/path/to/release.keystore
+storePassword=你的密钥库密码
+keyAlias=你的密钥别名
+keyPassword=你的密钥密码
+```
+
+也可以使用 `BOLT_STORE_FILE`、`BOLT_STORE_PASSWORD`、`BOLT_KEY_ALIAS`、`BOLT_KEY_PASSWORD` 环境变量。未配置时 Release 输出 `app-release-unsigned.apk`，不会回退到公开的 debug 签名。
 
 安装到电视：
 

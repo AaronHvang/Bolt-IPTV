@@ -120,6 +120,7 @@ class Mp2Decoder(
     /** 当前自动增益系数，跨帧平滑变化 */
     private var gain = 1.0f
 
+
     init {
         setInitialInputBufferSize(initialInputBufferSize)
     }

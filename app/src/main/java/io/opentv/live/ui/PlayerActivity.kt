@@ -84,31 +84,55 @@ class PlayerActivity : AppCompatActivity() {
     private var current: Channel? = null
     private var overlayVisible = false
     private var sideVisible = false
-    private var retryCount = 0
+    /** 换台发起时间戳，用来判断 loading 是否应该闪出来 */
     private var tuneStartMs = 0L
+    /** loading 真正 show 的时间戳，用来保证显示最少持续一会儿 */
+    private var loadingShownAt = 0L
+    /** 预热接管时标记，跳过 STATE_BUFFERING 闪一下 */
+    private var warmTune = false
+    /** 换台原因：决定 STATE_BUFFERING 时要不要显示 loading overlay */
+    private enum class TuneReason { USER_SWITCH, STARTUP, ERROR_RETRY }
+    private var tuneReason = TuneReason.STARTUP
+    private var retryCount = 0
     private var digits = StringBuilder()
     private var aspectIndex = 0
+    /** 确认键按下后焦点会移到侧栏或按钮区，抬键不能再点击新焦点 */
+    private var consumeCenterUp = false
 
     /** 后台备机：提前把下一个频道的流缓冲好，换台时直接接管，省掉等关键帧的时间 */
     private var spare: ExoPlayer? = null
     private var spareChannelId: String? = null
-    /** 本次起播是否来自预热接管，仅用于日志 */
-    private var warmTune = false
 
     private val preloadTask = Runnable { startPreload() }
 
     /** 挂在当前活动播放器上；换台接管时要在新旧播放器间转移 */
     private val playerListener = object : Player.Listener {
+
         override fun onPlaybackStateChanged(state: Int) {
             when (state) {
                 Player.STATE_BUFFERING -> {
-                    loading.visibility = View.VISIBLE
-                    loadingText.text = "正在连接…"
-                    errorText.visibility = View.GONE
-                    toastText.visibility = View.GONE
+                    // 预热接管时如果备机还差一丢丢到 READY，跳过这次 BUFFERING 的闪一下
+                    if (warmTune) return
+                    if (tuneReason == TuneReason.USER_SWITCH) {
+                        // 用户主动换台：保持上一帧，永远不弹 loading overlay
+                        errorText.visibility = View.GONE
+                        toastText.visibility = View.GONE
+                    } else {
+                        // 首次启动 / 错误重试：没有上一帧可保持，500ms 后弹 loading 避免纯黑屏
+                        val sinceTune = android.os.SystemClock.elapsedRealtime() - tuneStartMs
+                        handler.removeCallbacks(loadingDelayedCheck)
+                        if (sinceTune < 500) {
+                            handler.postDelayed(loadingDelayedCheck, 500 - sinceTune)
+                        } else {
+                            showLoading()
+                        }
+                        errorText.visibility = View.GONE
+                        toastText.visibility = View.GONE
+                    }
                 }
                 Player.STATE_READY -> {
-                    loading.visibility = View.GONE
+                    warmTune = false
+                    hideLoading()
                     errorText.visibility = View.GONE
                     retryCount = 0
                     if (BuildConfig.DEBUG && tuneStartMs > 0) {
@@ -121,13 +145,12 @@ class PlayerActivity : AppCompatActivity() {
                     updateBars()
                     dumpTracks()
                     // 起播稳定后再去预热下一个台，避免抢带宽/CPU
-                    handler.removeCallbacks(preloadTask)
-                    handler.postDelayed(preloadTask, PRELOAD_DELAY_MS)
+                    schedulePreload()
                 }
                 Player.STATE_ENDED -> {
-                    loading.visibility = View.GONE
+                    hideLoading()
                     showToast("直播信号已断开，正在重连…")
-                    handler.postDelayed({ current?.let { tune(it, false) } }, 1500)
+                    handler.postDelayed({ current?.let { tune(it, false, TuneReason.ERROR_RETRY) } }, 1500)
                 }
             }
         }
@@ -143,11 +166,11 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            loading.visibility = View.GONE
+            hideLoading()
             if (retryCount < 2) {
                 retryCount++
                 showToast("连接中断，正在重试（$retryCount/2）")
-                handler.postDelayed({ current?.let { tune(it, false) } }, 1200)
+                handler.postDelayed({ current?.let { tune(it, false, TuneReason.ERROR_RETRY) } }, 1200)
             } else {
                 showError(error)
             }
@@ -188,6 +211,21 @@ class PlayerActivity : AppCompatActivity() {
 
         playerView.setKeepContentOnPlayerReset(prefs.keepLastFrame)
         playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+        // 触屏设备单击画面唤起/收起控制条；侧栏打开时单击画面只关闭侧栏
+        playerView.setOnClickListener {
+            when {
+                sideVisible -> hideSide()
+                overlayVisible -> hideBars()
+                else -> showBars(focusActions = false)
+            }
+        }
+        // 侧栏保持电视端的 400dp 上限，窄屏则使用扣除边距后的可用宽度
+        sidePanel.layoutParams = sidePanel.layoutParams.apply {
+            width = minOf(
+                Ui.dpi(this@PlayerActivity, 400f),
+                resources.displayMetrics.widthPixels - Ui.dpi(this@PlayerActivity, 32f)
+            )
+        }
 
         player = buildPlayer()
         playerView.player = player
@@ -201,11 +239,11 @@ class PlayerActivity : AppCompatActivity() {
             ?: repo.findById(prefs.lastChannelId)
             ?: repo.channels.firstOrNull()
         if (target == null) {
-            loading.visibility = View.GONE
+            hideLoading()
             errorText.text = "还没有可用频道，请先在「设置 → 管理播放源」里添加播放列表。"
             errorText.visibility = View.VISIBLE
         } else {
-            tune(target, false)
+            tune(target, false, TuneReason.STARTUP)
         }
 
         handler.post(object : Runnable {
@@ -225,7 +263,7 @@ class PlayerActivity : AppCompatActivity() {
             "画面比例" to { cycleAspect() },
             "播放信息" to { showPlayInfo() },
             "收藏" to { toggleFavorite() },
-            "刷新" to { current?.let { tune(it, true) } }
+            "刷新" to { current?.let { tune(it, true, TuneReason.STARTUP) } }
         ).forEach { (label, action) ->
             val tv = Ui.actionButton(this, label)
             tv.setOnClickListener { action() }
@@ -281,13 +319,17 @@ class PlayerActivity : AppCompatActivity() {
             .setMediaId(channel.id)
             .build()
         return if (url.contains(".m3u8", true)) {
-            HlsMediaSource.Factory(ds).createMediaSource(item)
+            // 准备阶段只解析播放列表、不预取分片，起播更快，备机预热也不抢带宽
+            HlsMediaSource.Factory(ds)
+                .setAllowChunklessPreparation(true)
+                .createMediaSource(item)
         } else {
             ProgressiveMediaSource.Factory(ds).createMediaSource(item)
         }
     }
 
-    private fun tune(channel: Channel, manual: Boolean) {
+    private fun tune(channel: Channel, manual: Boolean, reason: TuneReason = TuneReason.USER_SWITCH) {
+        tuneReason = reason
         current = channel
         prefs.lastChannelId = channel.id
         retryCount = 0
@@ -303,7 +345,7 @@ class PlayerActivity : AppCompatActivity() {
 
         val url = channel.url.trim()
         if (url.startsWith("rtp://") || url.startsWith("udp://") || url.startsWith("rtsp://")) {
-            loading.visibility = View.GONE
+            hideLoading()
             errorText.text = "该频道是原生组播/RTSP 地址：\n$url\n\n请把它改成 udpxy 的 HTTP 单播地址（http://网关:端口/rtp/组播IP:端口）后再试。"
             errorText.visibility = View.VISIBLE
             return
@@ -312,22 +354,24 @@ class PlayerActivity : AppCompatActivity() {
         // 备机刚好把这个台缓冲好了就直接接管：省掉等关键帧的那一两秒
         if (promoteSpare(channel)) return
 
-        // 走到这里才需要真正建连，此时再显示"正在连接"
+        // promoteSpare 没命中 → 必须重置 warmTune，否则上一次预热残留
+        // 会导致 STATE_BUFFERING 被跳过 → 慢台黑屏
+        warmTune = false
         toastText.visibility = View.GONE
-        loading.visibility = View.VISIBLE
-        loadingText.text = "正在连接 ${channel.name}…"
 
         val mediaSource = createMediaSource(channel) ?: run {
-            loading.visibility = View.GONE
             errorText.text = "该频道地址无法播放：\n$url"
             errorText.visibility = View.VISIBLE
+            hideLoading()
             return
         }
-        warmTune = false
         player.setMediaSource(mediaSource)
         player.playWhenReady = true
         player.prepare()
         tuneStartMs = android.os.SystemClock.elapsedRealtime()
+        // 换台立刻预热下一个，不等 STATE_READY：用户停止快速换台时
+        // 备机已经开始缓冲了，下次调台就能真正命中
+        startPreload()
     }
 
     /** 命中预热则把备机提升为主播放器；返回是否成功接管 */
@@ -362,23 +406,45 @@ class PlayerActivity : AppCompatActivity() {
         warmTune = true
         tuneStartMs = android.os.SystemClock.elapsedRealtime()
         // 备机已处于 READY，不会再回调 STATE_READY，这里的界面状态要自己收尾
-        loading.visibility = View.GONE
+        hideLoading()
         errorText.visibility = View.GONE
         updateBars()
-        // 接管时播放器本来就是 READY，不会再触发 READY 回调，这里手动续上下一轮预热
-        handler.removeCallbacks(preloadTask)
-        handler.postDelayed(preloadTask, PRELOAD_DELAY_MS)
+        // 接管后立刻预热下一个，不等 STATE_READY 延迟
+        startPreload()
         return true
     }
 
-    /** 在后台把下一个频道缓冲好 */
+    /** 根据设置安排下一次预热；关闭时同时释放已有备机 */
+    private fun schedulePreload() {
+        handler.removeCallbacks(preloadTask)
+        if (prefs.preloadNext) {
+            handler.postDelayed(preloadTask, PRELOAD_DELAY_MS)
+        } else {
+            clearSpare()
+        }
+    }
+
+    private fun clearSpare() {
+        handler.removeCallbacks(preloadTask)
+        spare?.release()
+        spare = null
+        spareChannelId = null
+    }
+
+    /** 在后台把下一个频道缓冲好，沿用上一次换台的方向 */
     private fun startPreload() {
+        if (!prefs.preloadNext) {
+            clearSpare()
+            return
+        }
         val cur = current ?: return
         val list = repo.channels
         if (list.size < 2) return
         val idx = list.indexOfFirst { it.id == cur.id }
         if (idx < 0) return
-        val next = list[(idx + 1) % list.size]
+        // 沿用户最近换台方向预热，命中概率高得多
+        val nextIdx = (idx + lastZapDelta + list.size) % list.size
+        val next = list[nextIdx]
         if (next.id == cur.id) return
         if (next.id == spareChannelId) return
         val src = createMediaSource(next) ?: return
@@ -411,6 +477,23 @@ class PlayerActivity : AppCompatActivity() {
         }
         errorText.text = "$msg\n\n频道：${current?.name.orEmpty()}\n地址：${current?.url.orEmpty()}\n\n按「上/下」换台，按「菜单」重试。"
         errorText.visibility = View.VISIBLE
+        hideLoading()
+    }
+
+    private val loadingDelayedCheck = Runnable {
+        if (player.playbackState == Player.STATE_BUFFERING && player != spare) {
+            showLoading()
+        }
+    }
+
+    private fun showLoading(text: String = "正在连接…") {
+        loadingText.text = text
+        loading.visibility = View.VISIBLE
+        loadingShownAt = android.os.SystemClock.elapsedRealtime()
+    }
+
+    private fun hideLoading() {
+        handler.removeCallbacks(loadingDelayedCheck)
         loading.visibility = View.GONE
     }
 
@@ -639,7 +722,26 @@ class PlayerActivity : AppCompatActivity() {
         if (next != i) sideCats.getChildAt(next).requestFocus()
     }
 
-    /** 从频道列表按上键回到分类行，落在当前选中的分类上 */
+    /**
+     * 在频道列表内逐行移动焦点。到达边界返回 false，由调用方决定是否进入分类行。
+     * 目标行尚未布局时先滚动，再在下一帧把焦点落过去。
+     */
+    private fun moveSideChannel(delta: Int): Boolean {
+        val focused = sideList.findFocus() ?: return false
+        val holder = sideList.findContainingViewHolder(focused) ?: return false
+        val position = holder.bindingAdapterPosition
+        if (position == RecyclerView.NO_POSITION) return false
+        val target = position + delta
+        if (target !in 0 until sideAdapter.itemCount) return false
+
+        val lm = sideList.layoutManager as? LinearLayoutManager ?: return false
+        lm.findViewByPosition(target)?.let { return it.requestFocus() }
+        lm.scrollToPosition(target)
+        sideList.post { lm.findViewByPosition(target)?.requestFocus() }
+        return true
+    }
+
+    /** 从频道列表第一行按上键进入分类行，落在当前选中的分类上 */
     private fun focusSideChips() {
         setSideChipsFocusable(true)
         val target = (0 until sideCats.childCount)
@@ -687,7 +789,11 @@ class PlayerActivity : AppCompatActivity() {
         showToast(if (added) "已收藏 ${c.name}" else "已取消收藏 ${c.name}")
     }
 
+    /** 记住最近一次换台方向，预热同方向的下一个频道 */
+    private var lastZapDelta = 1
+
     private fun zap(delta: Int) {
+        lastZapDelta = delta
         val list = repo.channels
         if (list.isEmpty()) return
         val cur = current ?: return
@@ -863,6 +969,16 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_UP && consumeCenterUp &&
+            event.keyCode in listOf(
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_NUMPAD_ENTER
+            )
+        ) {
+            consumeCenterUp = false
+            return true
+        }
         if (event.action == KeyEvent.ACTION_DOWN) {
             val overlayFocus = focusInsideOverlay()
             // 侧栏打开时方向键全部由侧栏接管：上=分类行、下=频道列表、左右=切分类
@@ -879,7 +995,10 @@ class PlayerActivity : AppCompatActivity() {
                     }
 
                     KeyEvent.KEYCODE_DPAD_UP -> {
-                        if (!focusInSideCats()) focusSideChips()
+                        if (focusInSideCats()) return true
+                        // 列表内逐行向上；只有已经在第一行时才进入分类行
+                        if (moveSideChannel(-1)) return true
+                        focusSideChips()
                         return true
                     }
 
@@ -951,6 +1070,7 @@ class PlayerActivity : AppCompatActivity() {
                     } else {
                         toggleSide()
                     }
+                    consumeCenterUp = true
                     return true
                 }
 
@@ -1020,6 +1140,11 @@ class PlayerActivity : AppCompatActivity() {
         if (hasFocus) hideSystemUi()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (!prefs.preloadNext) clearSpare()
+    }
+
     override fun onPause() {
         super.onPause()
         player.pause()
@@ -1082,6 +1207,6 @@ class PlayerActivity : AppCompatActivity() {
         const val EXTRA_CHANNEL_ID = "channel_id"
 
         /** 起播稳定后多久开始预热下一个频道 */
-        private const val PRELOAD_DELAY_MS = 2000L
+        private const val PRELOAD_DELAY_MS = 500L
     }
 }

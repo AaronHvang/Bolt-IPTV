@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import io.opentv.live.App
 import io.opentv.live.R
@@ -27,15 +28,46 @@ class ChannelAdapter(
     private var favorites: Set<String> = emptySet()
     private val epg = App.get().epg
     private val inflater = LayoutInflater.from(context)
+    /** 网格模式下 thumb 固定高度（dp 换算后的像素值），由外部在 applyLayout 时计算 */
+    private var gridThumbHeight = 0
 
     class Holder(val root: View) : RecyclerView.ViewHolder(root)
 
+    /** 网格尺寸变化时更新 thumb 高度，避免每个卡片绑定后 post 改高度导致重排 */
+    fun setGridThumbHeight(px: Int) {
+        if (gridThumbHeight == px) return
+        gridThumbHeight = px
+        if (grid) notifyDataSetChanged()
+    }
+
     @SuppressLint("NotifyDataSetChanged")
     fun submit(list: List<Channel>, grid: Boolean, favorites: Set<String>) {
+        val oldItems = items
+        val oldFavorites = this.favorites
         this.items = list
-        this.grid = grid
         this.favorites = favorites
-        notifyDataSetChanged()
+        // 网格/列表切换会改变条目类型，只能整体重建
+        if (this.grid != grid) {
+            this.grid = grid
+            notifyDataSetChanged()
+            return
+        }
+        // 差量刷新：切换分类、收藏或设置时只更新变化的卡片，避免整墙重绘和焦点丢失
+        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize(): Int = oldItems.size
+
+            override fun getNewListSize(): Int = list.size
+
+            override fun areItemsTheSame(oldPos: Int, newPos: Int): Boolean =
+                oldItems[oldPos].id == list[newPos].id
+
+            override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean {
+                val new = list[newPos]
+                return oldItems[oldPos] == new &&
+                    oldFavorites.contains(new.id) == favorites.contains(new.id)
+            }
+        })
+        diff.dispatchUpdatesTo(this)
     }
 
     fun itemAt(position: Int): Channel? = items.getOrNull(position)
@@ -52,12 +84,22 @@ class ChannelAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
         val layout = if (viewType == TYPE_GRID) R.layout.item_channel_grid else R.layout.item_channel_row
-        return Holder(inflater.inflate(layout, parent, false))
+        val holder = Holder(inflater.inflate(layout, parent, false))
+        // 网格卡片的 thumb 高度在创建时就固定好，避免 bind 时 post 改高度导致整墙重排
+        if (viewType == TYPE_GRID && gridThumbHeight > 0) {
+            holder.root.findViewById<View>(R.id.thumb).layoutParams =
+                holder.root.findViewById<View>(R.id.thumb).layoutParams.apply { height = gridThumbHeight }
+        }
+        return holder
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val c = items[position]
-        if (grid) bindGrid(holder.root, c) else bindRow(holder.root, c)
+        if (grid) {
+            bindGrid(holder.root, c)
+        } else {
+            bindRow(holder.root, c)
+        }
 
         holder.root.setOnClickListener { onClick(c) }
         holder.root.setOnLongClickListener {

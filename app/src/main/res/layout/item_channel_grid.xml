@@ -62,7 +62,7 @@
             android:paddingBottom="2dp"
             android:text="1080P"
             android:textColor="#FFFFFF"
-            android:textSize="9sp"
+            android:textSize="11sp"
             android:visibility="gone" />
 
         <TextView
@@ -79,7 +79,7 @@
             android:paddingBottom="4dp"
             android:text=""
             android:textColor="#F2F5FA"
-            android:textSize="10sp" />
+            android:textSize="11sp" />
     </FrameLayout>
 
     <LinearLayout
@@ -113,7 +113,7 @@
             android:maxLines="1"
             android:text="C1"
             android:textColor="#F2F7FC"
-            android:textSize="9sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 

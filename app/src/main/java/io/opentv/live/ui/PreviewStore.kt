@@ -15,6 +15,9 @@ object PreviewStore {
     const val WIDTH = 320
     const val HEIGHT = 180
 
+    /** 预览图有效期：超过 24 小时会重新抓一帧替换 */
+    private const val VALIDITY_MS = 24L * 60 * 60 * 1000
+
     private val memory = object : LruCache<String, Bitmap>(6 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
@@ -22,7 +25,7 @@ object PreviewStore {
 
     private val dir: File by lazy { File(App.get().filesDir, "previews") }
 
-    /** 取已生成的预览图；没有则返回 null */
+    /** 取已生成的预览图；超过有效期也先返回旧图，等后台抓好再替换 */
     fun get(id: String): Bitmap? {
         memory.get(id)?.let { return it }
         val file = File(dir, "$id.jpg")
@@ -32,7 +35,12 @@ object PreviewStore {
         return bitmap
     }
 
-    fun has(id: String): Boolean = memory.get(id) != null || File(dir, "$id.jpg").exists()
+    /** 是否还有效（文件存在且未超过 24 小时） */
+    fun has(id: String): Boolean {
+        val file = File(dir, "$id.jpg")
+        if (!file.exists()) return false
+        return System.currentTimeMillis() - file.lastModified() < VALIDITY_MS
+    }
 
     fun put(id: String, source: Bitmap) {
         val scaled = if (source.width == WIDTH && source.height == HEIGHT) {

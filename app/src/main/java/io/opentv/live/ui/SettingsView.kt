@@ -148,6 +148,10 @@ class SettingsView(context: Context) : LinearLayout(context) {
             prefs.keepLastFrame = checked
             Toast.makeText(context, "下次进入播放页生效", Toast.LENGTH_SHORT).show()
         }
+        switchRow("下一频道预热", "提前缓冲下一台，关闭可减少流量", prefs.preloadNext) { checked ->
+            prefs.preloadNext = checked
+            refresh()
+        }
         row("默认 UA / Referer", if (prefs.defaultReferer.isNotBlank()) "已自定义" else "默认") { showUaDialog() }
 
         group("关于", 0xFFE05C6E.toInt(), "i")
@@ -253,7 +257,7 @@ class SettingsView(context: Context) : LinearLayout(context) {
         })
         texts.addView(TextView(context).apply {
             text = subtitle
-            textSize = 10f
+            textSize = 11f
             setTextColor(ContextCompat.getColor(context, R.color.text_disabled))
             setPadding(0, Ui.dpi(context, 2f), 0, 0)
         })
@@ -273,7 +277,7 @@ class SettingsView(context: Context) : LinearLayout(context) {
 
     private fun iconCircle(): TextView = TextView(context).apply {
         text = rowGlyph
-        textSize = 10f
+        textSize = 11f
         gravity = Gravity.CENTER
         setTextColor(0xFFFFFFFF.toInt())
         background = Ui.rounded(rowColor, Ui.dp(context, 11f))

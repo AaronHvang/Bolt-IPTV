@@ -32,5 +32,13 @@ Thumbs.db
 # 演示素材（体积大，仅本地保留）
 *.mp4
 
+# 个人播放列表、节目单与源配置，禁止提交到开源仓库
+*.m3u
+*.m3u8
+*.txt
+*.xml.gz
+sources.properties
+secrets.properties
+
 # 本地临时截图
 .shot_*.png

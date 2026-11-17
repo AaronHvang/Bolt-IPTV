@@ -19,14 +19,14 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("auto_update_epg", true)
         set(value) = sp.edit().putBoolean("auto_update_epg", value).apply()
 
-    /** 过滤标清源（1080P 源不够用时可以关掉） */
+    /** 过滤标清源；仅新安装默认关闭，已有用户的设置保持不变 */
     var filterSd: Boolean
-        get() = sp.getBoolean("filter_sd", true)
+        get() = sp.getBoolean("filter_sd", false)
         set(value) = sp.edit().putBoolean("filter_sd", value).apply()
 
-    /** 过滤 AVS/AVS2 编码源 */
+    /** 过滤 AVS/AVS2 编码源；仅新安装默认关闭，已有用户的设置保持不变 */
     var filterAvs: Boolean
-        get() = sp.getBoolean("filter_avs", true)
+        get() = sp.getBoolean("filter_avs", false)
         set(value) = sp.edit().putBoolean("filter_avs", value).apply()
 
     /** 换台时保留上一画面 */
@@ -38,6 +38,11 @@ class Prefs(context: Context) {
     var hardwareFirst: Boolean
         get() = sp.getBoolean("hw_first", true)
         set(value) = sp.edit().putBoolean("hw_first", value).apply()
+
+    /** 播放稳定后预热下一个频道，关闭可减少后台流量和解码开销 */
+    var preloadNext: Boolean
+        get() = sp.getBoolean("preload_next", true)
+        set(value) = sp.edit().putBoolean("preload_next", value).apply()
 
     /** 频道列表是否网格模式 */
     var gridMode: Boolean

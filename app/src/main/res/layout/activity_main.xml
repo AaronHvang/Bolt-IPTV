@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_main">
@@ -52,7 +53,7 @@
                     android:layout_height="17dp"
                     android:contentDescription="@string/app_name"
                     android:src="@drawable/ic_nav_channels"
-                    android:tint="@color/nav_icon_tint" />
+                    app:tint="@color/nav_icon_tint" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -81,7 +82,7 @@
                     android:layout_height="17dp"
                     android:contentDescription="收藏"
                     android:src="@drawable/ic_nav_favorites"
-                    android:tint="@color/nav_icon_tint" />
+                    app:tint="@color/nav_icon_tint" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -110,7 +111,7 @@
                     android:layout_height="17dp"
                     android:contentDescription="节目表"
                     android:src="@drawable/ic_nav_epg"
-                    android:tint="@color/nav_icon_tint" />
+                    app:tint="@color/nav_icon_tint" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -139,7 +140,7 @@
                     android:layout_height="17dp"
                     android:contentDescription="设置"
                     android:src="@drawable/ic_nav_settings"
-                    android:tint="@color/nav_icon_tint" />
+                    app:tint="@color/nav_icon_tint" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -151,6 +152,23 @@
                     android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
+    </FrameLayout>
+
+    <!-- 启动 splash：windowBackground 阶段已显示浅色底，这里衔接并加 Bolt IPTV 文字 -->
+    <FrameLayout
+        android:id="@+id/splash"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/bg">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="Bolt IPTV"
+            android:textColor="@color/accent"
+            android:textSize="48sp"
+            android:textStyle="bold" />
     </FrameLayout>
 
 </FrameLayout>

@@ -93,9 +93,12 @@
 
         <TextView
             android:id="@+id/epgEmpty"
-            android:layout_width="600dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:maxWidth="600dp"
             android:gravity="center"
             android:lineSpacingExtra="6dp"
             android:text="还没有节目单数据。\n在「播放源」里为订阅源填写 XMLTV 地址，或到「设置」里填写节目单地址后刷新。"

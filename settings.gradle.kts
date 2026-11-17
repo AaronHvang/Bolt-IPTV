@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "FreeTV"
+rootProject.name = "Bolt-IPTV"
 include(":app")

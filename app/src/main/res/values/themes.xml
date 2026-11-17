@@ -14,6 +14,11 @@
         <item name="android:alertDialogTheme">@style/Theme.FreeTV.Dialog</item>
     </style>
 
+    <!-- 启动专用主题：windowBackground 放 splash 图，onCreate 里立刻切回普通主题 -->
+    <style name="Theme.FreeTV.Launcher" parent="Theme.FreeTV">
+        <item name="android:windowBackground">@drawable/bg_splash</item>
+    </style>
+
     <style name="Theme.FreeTV.Player" parent="Theme.FreeTV">
         <item name="android:windowBackground">@android:color/black</item>
     </style>

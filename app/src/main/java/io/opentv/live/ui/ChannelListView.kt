@@ -36,6 +36,7 @@ class ChannelListView(context: Context) : LinearLayout(context) {
     private val emptyPanel: View
     private val emptyTitle: TextView
     private val emptyDesc: TextView
+    private val emptyAction: TextView
 
     private val channelAdapter = ChannelAdapter(context, { channel -> onPlay?.invoke(channel) }, { channel -> showChannelMenu(channel) })
 
@@ -48,6 +49,12 @@ class ChannelListView(context: Context) : LinearLayout(context) {
     private var favoritesOnly = false
     private var autoFocusDone = false
     private var visibleChannels: List<Channel> = emptyList()
+    private var gridSpan = 1
+    /** 已经生效的排版，用于避免重复重建 LayoutManager */
+    private var appliedGrid: Boolean? = null
+    private var appliedSpan = 0
+    /** 上次 refresh 时的分类 key，用于判断是否需要恢复滚动位置 */
+    private var lastRefreshCategory: String? = null
 
     init {
         orientation = VERTICAL
@@ -60,9 +67,20 @@ class ChannelListView(context: Context) : LinearLayout(context) {
         emptyPanel = findViewById(R.id.emptyPanel)
         emptyTitle = findViewById(R.id.emptyTitle)
         emptyDesc = findViewById(R.id.emptyDesc)
+        emptyAction = findViewById(R.id.emptyAction)
+        emptyAction.setOnClickListener { onOpenSources?.invoke() }
+        Ui.focusScale(emptyAction)
 
         channelList.adapter = channelAdapter
         channelList.itemAnimator = null
+        channelList.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                enqueueVisiblePreviews()
+            }
+        })
+        channelList.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            enqueueVisiblePreviews()
+        }
 
         btnCategory.setOnClickListener { showCategoryDialog() }
         findViewById<TextView>(R.id.btnRandom).setOnClickListener {
@@ -78,27 +96,110 @@ class ChannelListView(context: Context) : LinearLayout(context) {
 
     private fun applyLayout() {
         val gridMode = prefs.gridMode
-        val span = if (gridMode) 4 else 1
+        val widthDp = resources.configuration.screenWidthDp
+        gridSpan = if (gridMode) {
+            when {
+                widthDp in 1 until 720 -> 2
+                widthDp < 900 -> 3
+                else -> 4
+            }
+        } else 1
+        // 排版没有变化就不要重建：换 LayoutManager 会清空滚动位置和焦点，
+        // 从播放页返回时会跳回列表顶部
+        if (appliedGrid == gridMode && appliedSpan == gridSpan) return
+        appliedGrid = gridMode
+        appliedSpan = gridSpan
         channelList.layoutManager = if (gridMode) {
-            GridLayoutManager(context, span)
+            GridLayoutManager(context, gridSpan)
         } else {
             LinearLayoutManager(context)
         }
         while (channelList.itemDecorationCount > 0) {
             channelList.removeItemDecorationAt(0)
         }
-        channelList.addItemDecoration(GridSpacing(span, Ui.dpi(context, 16f)))
+        channelList.addItemDecoration(GridSpacing(gridSpan, Ui.dpi(context, 16f)))
+
+        // 网格模式：提前算好 thumb 的 16:9 固定高度，避免每张卡 bind 时 post 改高度导致整墙重排
+        if (gridMode) {
+            channelList.post {
+                val listWidth = channelList.width - channelList.paddingStart - channelList.paddingEnd
+                val itemPadding = Ui.dpi(context, 6f) * 2  // item 根 LinearLayout 的左右 padding 各 6dp
+                val spacing = Ui.dpi(context, 16f) * (gridSpan - 1)
+                val itemWidth = (listWidth - spacing) / gridSpan - itemPadding
+                val thumbHeight = (itemWidth * 9 / 16).coerceAtLeast(Ui.dpi(context, 80f))
+                channelAdapter.setGridThumbHeight(thumbHeight)
+            }
+        } else {
+            channelAdapter.setGridThumbHeight(0)
+        }
     }
 
     fun requestInitialFocus() {
-        channelList.post { focusFirstChannel() }
+        channelList.post {
+            if (emptyPanel.visibility == View.VISIBLE && emptyAction.visibility == View.VISIBLE) {
+                emptyAction.requestFocus()
+            } else {
+                focusFirstChannel()
+            }
+        }
     }
+
+    /** 从播放页或后台返回时，把焦点还给刚才观看的频道，必要时滚到该卡片 */
+    fun restoreFocus(channelId: String?) {
+        if (!isShown || visibility != View.VISIBLE) return
+        if (visibleChannels.isEmpty()) {
+            if (emptyAction.visibility == View.VISIBLE) emptyAction.requestFocus()
+            return
+        }
+        val lm = channelList.layoutManager as? LinearLayoutManager ?: return
+        val index = visibleChannels.indexOfFirst { it.id == channelId }
+            .takeIf { it >= 0 } ?: 0
+        channelList.post {
+            lm.scrollToPosition(index)
+            // scrollToPosition 只保证目标可见，等这一帧布局完成后再取视图
+            channelList.post {
+                channelList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
+            }
+        }
+    }
+
+    /** Tab 切换回来时：LinearLayoutManager 已经保留了滚动位置，
+     * 只需要把焦点还给当前可见的卡片，不要强制滚动 */
+    fun focusCurrentVisible() {
+        if (!isShown || visibility != View.VISIBLE) return
+        if (visibleChannels.isEmpty()) {
+            if (emptyAction.visibility == View.VISIBLE) emptyAction.requestFocus()
+            return
+        }
+        val lm = channelList.layoutManager as? LinearLayoutManager ?: return
+        val firstVisible = lm.findFirstVisibleItemPosition().takeIf { it >= 0 } ?: return
+        channelList.post {
+            channelList.findViewHolderForAdapterPosition(firstVisible)?.itemView?.requestFocus()
+        }
+    }
+
+    /** 只抓取当前屏幕和前后一行/两项的预览，滚动后再补充新的可见卡片 */
+    private fun enqueueVisiblePreviews() {
+        if (!isShown || visibleChannels.isEmpty()) return
+        val lm = channelList.layoutManager as? LinearLayoutManager ?: return
+        val first = lm.findFirstVisibleItemPosition()
+        val last = lm.findLastVisibleItemPosition()
+        if (first == RecyclerView.NO_POSITION || last == RecyclerView.NO_POSITION) return
+        val nearby = if (prefs.gridMode) gridSpan else 2
+        val from = (first - nearby).coerceAtLeast(0)
+        val to = (last + nearby).coerceAtMost(visibleChannels.lastIndex)
+        capturer?.enqueue(visibleChannels.subList(from, to + 1))
+    }
+
+    /** 焦点是否在频道网格内；头部按钮区按上键时要回导航胶囊，网格内仍交给系统逐级上移 */
+    fun isGridFocused(): Boolean = channelList.hasFocus()
 
     /** 页面可见时才抓预览帧；切到别的页或进入播放页立刻停下 */
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
         if (visibility == View.VISIBLE && windowVisibility == View.VISIBLE) {
             capturer?.start()
+            enqueueVisiblePreviews()
         } else {
             capturer?.stop()
         }
@@ -108,6 +209,7 @@ class ChannelListView(context: Context) : LinearLayout(context) {
         super.onWindowVisibilityChanged(visibility)
         if (visibility == View.VISIBLE && this.visibility == View.VISIBLE) {
             capturer?.start()
+            enqueueVisiblePreviews()
         } else {
             capturer?.stop()
         }
@@ -158,10 +260,28 @@ class ChannelListView(context: Context) : LinearLayout(context) {
 
     /** 数据变化后整体刷新（刷新播放源、收藏变化、设置变化时调用） */
     fun refresh() {
+        // 在 submit 改变 adapter 数据之前，记住滚动位置；
+        // DiffUtil.dispatchUpdatesTo 会破坏 LinearLayoutManager 的偏移
+        val lm = channelList.layoutManager as? LinearLayoutManager
+        val savedFirst = lm?.findFirstVisibleItemPosition() ?: -1
+        val savedOffset = lm?.findViewByPosition(savedFirst)?.top ?: 0
+
         applyLayout()
         val groups = buildGroups()
         if (groups.none { it.key == selectedKey }) selectedKey = KEY_ALL
         refreshChannels()
+
+        // 如果分类没变化，恢复之前的滚动位置
+        if (savedFirst >= 0 && selectedKey == lastRefreshCategory) {
+            channelList.post {
+                val currentLm = channelList.layoutManager as? LinearLayoutManager ?: return@post
+                currentLm.scrollToPositionWithOffset(savedFirst, savedOffset)
+                channelList.post {
+                    channelList.findViewHolderForAdapterPosition(savedFirst)?.itemView?.requestFocus()
+                }
+            }
+        }
+        lastRefreshCategory = selectedKey
     }
 
     private fun buildGroups(): List<GroupEntry> {
@@ -197,7 +317,7 @@ class ChannelListView(context: Context) : LinearLayout(context) {
         emptyPanel.visibility = if (empty) View.VISIBLE else View.GONE
         channelList.visibility = if (empty) View.INVISIBLE else View.VISIBLE
 
-        capturer?.enqueue(list)
+        channelList.post { enqueueVisiblePreviews() }
 
         // 首次拿到频道后把焦点落到第一张卡片，避免启动时停在搜索框并弹出键盘
         if (!autoFocusDone && list.isNotEmpty()) {
@@ -205,9 +325,17 @@ class ChannelListView(context: Context) : LinearLayout(context) {
             channelList.post { focusFirstChannel() }
         }
         when {
-            repo.channels.isEmpty() -> {
+            repo.sources.isEmpty() -> {
                 emptyTitle.text = "还没有频道"
-                emptyDesc.text = "在「设置 → 管理播放源」里添加 M3U 订阅地址，或导入本地播放列表后即可观看。"
+                emptyDesc.text = "添加 M3U 订阅地址，或导入本地播放列表后即可观看。"
+            }
+            repo.channels.isEmpty() && repo.hasUnfilteredChannels -> {
+                emptyTitle.text = "频道已被设置过滤"
+                emptyDesc.text = "当前过滤设置隐藏了全部频道，可在「设置 → 频道列表」中关闭相应过滤项。"
+            }
+            repo.channels.isEmpty() -> {
+                emptyTitle.text = "还没有可用频道"
+                emptyDesc.text = "请检查播放源是否已启用并能正常访问，然后重新更新。"
             }
             favoritesOnly -> {
                 emptyTitle.text = "还没有收藏"
@@ -218,6 +346,9 @@ class ChannelListView(context: Context) : LinearLayout(context) {
                 emptyDesc.text = "换一个频道分类看看，或者到设置里更新播放源。"
             }
         }
+        emptyAction.visibility =
+            if (repo.channels.isEmpty() && !repo.hasUnfilteredChannels) View.VISIBLE else View.GONE
+        emptyAction.text = if (repo.sources.isEmpty()) "添加播放源" else "管理播放源"
     }
 
     private fun showChannelMenu(channel: Channel) {

@@ -103,7 +103,9 @@ class SourcesView(context: Context) : LinearLayout(context) {
             return
         }
         qrServer = server
-        android.util.Log.d("FreeTV", "扫码添加地址 ${server.address}")
+        val addresses = server.addresses
+        val primaryAddress = addresses.first()
+        android.util.Log.d("FreeTV", "扫码添加地址 $primaryAddress")
 
         val density = resources.displayMetrics.density
         val qrSize = (250 * density).toInt()
@@ -115,12 +117,12 @@ class SourcesView(context: Context) : LinearLayout(context) {
         }
 
         box.addView(ImageView(context).apply {
-            setImageBitmap(QrCode.render(server.address, qrSize))
+            setImageBitmap(QrCode.render(primaryAddress, qrSize))
             scaleType = ImageView.ScaleType.FIT_CENTER
         }, LinearLayout.LayoutParams(qrSize, qrSize))
 
         box.addView(TextView(context).apply {
-            text = server.address
+            text = primaryAddress
             textSize = 15f
             gravity = android.view.Gravity.CENTER
             setTextColor(0xFF171A1F.toInt())
@@ -129,6 +131,21 @@ class SourcesView(context: Context) : LinearLayout(context) {
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = (16 * density).toInt() }
         })
+
+        if (addresses.size > 1) {
+            box.addView(TextView(context).apply {
+                text = "扫码无法打开时，可在手机浏览器尝试：\n" +
+                    addresses.drop(1).joinToString("\n")
+                textSize = 12f
+                gravity = android.view.Gravity.CENTER
+                setTextColor(0xFF6B7280.toInt())
+                setTextIsSelectable(true)
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = (12 * density).toInt() }
+            })
+        }
 
         box.addView(TextView(context).apply {
             text = "手机连同一个 Wi-Fi 扫码，可粘贴订阅地址\n也能直接上传手机里的 m3u / txt 播放列表"
@@ -143,7 +160,7 @@ class SourcesView(context: Context) : LinearLayout(context) {
 
         val dialog = AlertDialog.Builder(context, R.style.Theme_FreeTV_Dialog)
             .setTitle("扫码添加播放源")
-            .setView(box)
+            .setView(ScrollView(context).apply { addView(box) })
             .setNegativeButton("关闭", null)
             .create()
         dialog.setOnDismissListener {

@@ -28,6 +28,9 @@ class ChannelRepository(private val context: Context, private val prefs: Prefs) 
     var sources: List<Source> = emptyList()
         private set
 
+    /** 是否存在被过滤设置隐藏的频道，用于给出准确的空列表提示 */
+    val hasUnfilteredChannels: Boolean get() = rawChannels.isNotEmpty()
+
     var lastEpgUrl: String = ""
         private set
 
