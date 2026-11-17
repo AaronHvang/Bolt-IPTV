@@ -7,10 +7,21 @@ Bolt IPTV 提供低延迟 IPTV 流媒体能力，实现音视频一体化局域�
 这是一款面向电视与投影的原生 Android 直播电视播放器，基于 Kotlin + Media3(ExoPlayer) 自研，不依赖 Google 服务，可直接侧载到 Android TV / 投影仪 / 机顶盒。
 
 <p>
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue">
+  <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue">
   <img alt="minSdk" src="https://img.shields.io/badge/minSdk-23-green">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.24-purple">
 </p>
+
+## 下载安装
+
+到 [Releases](https://github.com/AaronHvang/Bolt-IPTV/releases/latest) 下载最新的 `Bolt-IPTV-x.y.z.apk`，侧载到 Android TV / 投影仪 / 机顶盒即可：
+
+```bash
+adb connect <电视IP>:5555
+adb install -r Bolt-IPTV-1.0.0.apk
+```
+
+> APK 使用固定密钥签名，可覆盖升级；请勿从第三方渠道下载修改版。
 
 ![首页](docs/screenshots/home.png)
 
@@ -143,4 +154,26 @@ JLayer 以依赖形式引入，仅用于补齐系统缺失的 MP2 解码；其�
 
 ## License
 
-[MIT](LICENSE)
+本项目采用 **GPL-3.0 与商业授权双许可（dual licensing）**。
+
+**开源使用（免费）**
+
+- 遵循 [GNU GPL v3.0](LICENSE) 即可免费使用、修改、分发，包括商业环境下的内部使用
+- 一旦对外分发修改版，必须以 GPL-3.0 公开完整对应源码，并保留原作者版权声明
+- GPL-3.0 不允许附加任何版税或分成要求
+
+**商业授权（付费）**
+
+以下场景无法通过 GPL-3.0 满足，需要另行获取商业授权：
+
+- 闭源分发（含改名后闭源上架应用商店）
+- 将本项目代码嵌入闭源产品，且不公开对应源码
+- 需要免除 GPL-3.0 的源码开放义务
+
+商业授权咨询：请在 [Issues](https://github.com/AaronHvang/Bolt-IPTV/issues) 留言，或通过 GitHub 主页联系作者。
+
+**商标**
+
+「Bolt IPTV」名称与图标不随代码授权，未经许可不得用于衍生产品的宣传与分发。
+
+Copyright (C) 2026 Aaron Huang
