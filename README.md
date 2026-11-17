@@ -27,7 +27,7 @@ adb install -r Bolt-IPTV.apk
 
 > APK 使用固定密钥签名，可覆盖升级；请勿从第三方渠道下载修改版。
 
-![首页](docs/screenshots/home.png)
+![频道总览](website/assets/channels.jpg)
 
 ## 特性
 
@@ -43,9 +43,13 @@ adb install -r Bolt-IPTV.apk
 
 ## 截图
 
-| 播放信息条 | 播放页 |
+| 频道总览 | 节目单 |
 | --- | --- |
-| ![播放信息](docs/screenshots/player-info.png) | ![播放页](docs/screenshots/player.png) |
+| ![频道总览](website/assets/focus.jpg) | ![节目单](website/assets/epg.jpg) |
+
+| 播放控制 | 频道侧栏 |
+| --- | --- |
+| ![播放控制](website/assets/play.jpg) | ![频道侧栏](website/assets/sidebar.jpg) |
 
 ## 换台为什么快
 
